@@ -96,15 +96,34 @@ func main() {
 	// check if any room is there in the connections that is not in the rooms
 	CheckRoomsInConnectionsPresent(OnlyConnections, GetAllRoomNames(&ah))
 
-	// extract connections
-
 	// Print the contents of the slice with a new line after each element
 	fmt.Println(strings.Join(originalFileLines, "\n") + "\n")
 
-	AddConnectionAndDistances(OnlyConnections, 0)
+	// Add Connections to the rooms where a connection is in the format "room1-room2" and room1 and room2 are in the rooms
+	AddConnections(OnlyConnections)
 
 	PrintAnthill()
 
+}
+
+func AddConnections(OnlyConnections []string) {
+	for _, connection := range OnlyConnections {
+		room1Name := strings.Split(connection, "-")[0]
+		room2Name := strings.Split(connection, "-")[1]
+		room1 := GetRoomByName(room1Name)
+		room2 := GetRoomByName(room2Name)
+		room1.Connections = append(room1.Connections, room2)
+		room2.Connections = append(room2.Connections, room1)
+	}
+}
+
+func GetRoomByName(name string) *Room {
+	for _, room := range ah.Rooms {
+		if room.Name == name {
+			return room
+		}
+	}
+	return nil
 }
 
 // RemoveComments removes the comments from the original file lines
@@ -328,57 +347,12 @@ func PrintAnthill() {
 	}
 }
 
-func AddConnectionAndDistances(connections []string, currentDistance int) {
-	// Create a map to store the rooms that have already been visited
-	visitedRooms := map[string]bool{}
-	// Create a queue to store the rooms that need to be checked for connections
-	roomQueue := []*Room{ah.StartRoom}
-	// Set the distance of the start room to 0
-	ah.StartRoom.Distance = 0
-	// Add the start room to the visited rooms map
-	visitedRooms[ah.StartRoom.Name] = true
-
-	for len(roomQueue) > 0 {
-		// Get the first room in the queue
-		currentRoom := roomQueue[0]
-		// Remove the first room from the queue
-		roomQueue = roomQueue[1:]
-
-		// Iterate through the connections
-		for _, connection := range connections {
-			// Split the connection into two room names
-			roomNames := strings.Split(connection, "-")
-			// Check if the current room is connected to one of the rooms in the connection
-			if currentRoom.Name == roomNames[0] || currentRoom.Name == roomNames[1] {
-				// Get the name of the other room in the connection
-				var connectedRoomName string
-				if currentRoom.Name == roomNames[0] {
-					connectedRoomName = roomNames[1]
-				} else {
-					connectedRoomName = roomNames[0]
-				}
-				// Find the connected room in the AntHill's rooms
-				var connectedRoom *Room
-				for _, r := range ah.Rooms {
-					if r.Name == connectedRoomName {
-						connectedRoom = r
-						break
-					}
-				}
-				// Check if the connected room has already been visited
-				if !visitedRooms[connectedRoomName] {
-					// Add the connected room to the queue
-					roomQueue = append(roomQueue, connectedRoom)
-					// Set the distance of the connected room to the current distance + 1
-					connectedRoom.Distance = currentDistance + 1
-					// Add the connected room to the visited rooms map
-					visitedRooms[connectedRoomName] = true
-					// Add the connected room to the current room's connections
-					currentRoom.Connections = append(currentRoom.Connections, connectedRoom)
-				}
-			}
+// RoomInConnections checks if a given room is in a slice of rooms
+func RoomInConnections(connections []*Room, room *Room) bool {
+	for _, r := range connections {
+		if r == room {
+			return true
 		}
-		// Increase the current distance by 1
-		currentDistance++
 	}
+	return false
 }
