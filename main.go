@@ -8,24 +8,27 @@ import (
 	"strings"
 )
 
+// Room represents a room in an ant hill
 type Room struct {
-	Name        string
-	X           int
-	Y           int
-	Connections []*Room
-	Visited     bool
-	Distance    int
+	Name        string  // name of the room
+	X           int     // x-coordinate of the room
+	Y           int     // y-coordinate of the room
+	Connections []*Room // list of rooms connected to this room
+	Visited     bool    // whether this room has been visited or not
+	Distance    int     // distance of this room from the start room
 }
 
+// AntHill represents an ant hill with rooms, a start room, an end room, and the number of ants
 type AntHill struct {
-	Rooms     []*Room
-	StartRoom *Room
-	EndRoom   *Room
-	Ants      int
+	Rooms     []*Room // list of all rooms in the ant hill
+	StartRoom *Room   // start room of the ant hill
+	EndRoom   *Room   // end room of the ant hill
+	Ants      int     // number of ants in the ant hill
 }
 
-var ah AntHill
+var ah AntHill // global variable representing the ant hill
 
+// ReadFile reads the given file and returns its contents as a list of lines
 func ReadFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -102,10 +105,16 @@ func main() {
 	// Add Connections to the rooms where a connection is in the format "room1-room2" and room1 and room2 are in the rooms
 	AddConnections(OnlyConnections)
 
+	checkUnconnectedRooms(&ah)
+
+	// assign distances to rooms based on their distance from the start room
+	AddDistances(&ah)
+
 	PrintAnthill()
 
 }
 
+// AddConnections adds connections between rooms based on the given list of connections in incoming format ["room1-room2", "room2-room3", ...]
 func AddConnections(OnlyConnections []string) {
 	for _, connection := range OnlyConnections {
 		room1Name := strings.Split(connection, "-")[0]
@@ -244,12 +253,15 @@ func NoDuplicateLines(s []string) {
 	}
 }
 
-// NoDuplicateCoords checks if there are duplicate coordinates in the slice
-func NoDuplicateCoords(s []*Room) {
+// NoDuplicateCoordsOrNames checks if there are duplicate coordinates in the slice
+func NoDuplicateCoordsOrNames(s []*Room) {
 	for i, room := range s {
 		for j, room2 := range s {
 			if i != j && room.X == room2.X && room.Y == room2.Y {
 				NoGo("Duplicate coordinates are not allowed")
+			}
+			if i != j && room.Name == room2.Name {
+				NoGo("Duplicate room names are not allowed")
 			}
 		}
 	}
@@ -265,7 +277,7 @@ func ExtractRooms(s []string) {
 	}
 	rooms = append(rooms, ah.StartRoom)
 	rooms = append(rooms, ah.EndRoom)
-	NoDuplicateCoords(rooms)
+	NoDuplicateCoordsOrNames(rooms)
 	// fill AntHill with the rooms
 	ah.Rooms = rooms
 }
@@ -347,12 +359,104 @@ func PrintAnthill() {
 	}
 }
 
-// RoomInConnections checks if a given room is in a slice of rooms
-func RoomInConnections(connections []*Room, room *Room) bool {
-	for _, r := range connections {
+// RoomInListOfRooms checks if a given room is in a slice of rooms
+func RoomInListOfRooms(list []*Room, room *Room) bool {
+	for _, r := range list {
 		if r == room {
 			return true
 		}
 	}
 	return false
+}
+
+// AddDistances adds the distance to the rooms startiing from the start room
+func AddDistances(ah *AntHill) {
+	// make a map of all rooms in the anthill with no startRoom and no value
+	roomsLeft := make(map[*Room]int)
+	for _, room := range ah.Rooms {
+		if room.Name != ah.StartRoom.Name {
+			roomsLeft[room] = 0
+		}
+	}
+	// Assign the distance to all the rooms
+	AssignDistance(ah.StartRoom.Connections, 1, &roomsLeft)
+}
+
+// checkUnconnectedRooms checks if there are rooms that are not connected to the anthill
+func checkUnconnectedRooms(ah *AntHill) {
+	for _, room := range ah.Rooms {
+		if len(room.Connections) == 0 {
+			NoGo(fmt.Sprintf("The room \"%v\" is not connected to the anthill", room.Name))
+		}
+	}
+}
+
+// AssignDistance assigns distances to rooms based on their distance from the start room recursively
+func AssignDistance(roomList []*Room, distanceToAssign int, roomsLeft *map[*Room]int) {
+	if len(roomList) == 0 {
+		return
+	}
+	for _, room := range roomList {
+		if room.Distance == 0 && room.Name != ah.StartRoom.Name {
+			room.Distance = distanceToAssign
+			// remove the room from the roomsLeft map
+			delete(*roomsLeft, room)
+		}
+	}
+	if len(*roomsLeft) > 0 {
+		// get a list of connections of all the rooms in the current list and concat them to the current list
+		newList := []*Room{}
+		for _, room := range roomList {
+			if len(unAssignedRoom(room.Connections)) > 0 {
+				newList = append(newList, unAssignedRoom(room.Connections)...)
+			}
+		}
+		AssignDistance(newList, distanceToAssign+1, roomsLeft)
+	}
+}
+
+// unAssignedRoom returns a list of connected rooms that are not assigned a distance
+func unAssignedRoom(rooms []*Room) []*Room {
+	for _, room := range rooms {
+		if room.Distance == 0 && room.Name != ah.StartRoom.Name {
+			return getUnassignedConnections(getRoomsWithHighestDistance(rooms))
+		}
+	}
+	return []*Room{}
+}
+
+// getUnassignedConnections returns a list of connections that are not assigned a distance
+func getUnassignedConnections(rooms []*Room) []*Room {
+	var unassignedConnections []*Room
+	for _, room := range rooms {
+		for _, connection := range room.Connections {
+			if connection.Distance == 0 && connection.Name != ah.StartRoom.Name {
+				unassignedConnections = append(unassignedConnections, connection)
+			}
+		}
+	}
+	return unassignedConnections
+}
+
+// getRoomsWithHighestDistance returns a list of rooms with the highest distance
+func getRoomsWithHighestDistance(rooms []*Room) []*Room {
+	var roomsWithHighestDistance []*Room
+	highestDistance := findHighestDistanceInList(rooms)
+	for _, room := range rooms {
+		if room.Distance == highestDistance {
+			roomsWithHighestDistance = append(roomsWithHighestDistance, room)
+		}
+	}
+	return roomsWithHighestDistance
+}
+
+// findHighestDistanceInList returns the highest distance in a list of rooms
+func findHighestDistanceInList(rooms []*Room) int {
+	highestDistance := 0
+	for _, room := range rooms {
+		if room.Distance > highestDistance {
+			highestDistance = room.Distance
+		}
+	}
+	return highestDistance
 }
