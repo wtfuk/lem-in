@@ -110,6 +110,9 @@ func main() {
 	// assign distances to rooms based on their distance from the start room
 	AddDistances(&ah)
 
+	// convert into a tree
+	MakeDirectionalByDepth(&ah)
+
 	PrintAnthill()
 
 }
@@ -459,4 +462,22 @@ func findHighestDistanceInList(rooms []*Room) int {
 		}
 	}
 	return highestDistance
+}
+
+// MakeDirectionalByDepth makes the anthill directional by removing connections that have a distance less than or equal to the room. Distance is calculated from the start room, making it a tree
+func MakeDirectionalByDepth(ah *AntHill) {
+	for _, room := range ah.Rooms {
+		removeConnectionsWithLessDistance(room)
+	}
+}
+
+// removeConnectionsWithLessDistance removes connections that have a distance less than or Equal to the room
+func removeConnectionsWithLessDistance(room *Room) {
+	var newConnections []*Room
+	for _, connection := range room.Connections {
+		if connection.Distance >= room.Distance {
+			newConnections = append(newConnections, connection)
+		}
+	}
+	room.Connections = newConnections
 }
